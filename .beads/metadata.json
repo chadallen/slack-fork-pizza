@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "slack_fork_pizza",
+  "project_id": "9aabd1bf-9d7a-49a9-9351-975bf86f66fc"
+}
