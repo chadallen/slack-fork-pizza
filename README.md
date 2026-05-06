@@ -1,15 +1,15 @@
 # slack-fork-pizza
 
-Slack notifications for Claude Code CLI. Get pinged in Slack when your agent needs attention — one thread per project, silence while it's working.
+Slack notifications for Claude Code CLI. Get pinged in Slack when your agent needs attention — one channel per project, automatically routed by project directory name.
 
 ## How it works
 
-`notify.py` is a Claude Code hook script that reads hook event JSON from stdin and posts threaded messages to Slack. Each project working directory gets its own thread. Two events are handled:
+`notify.py` is a Claude Code hook script that reads hook event JSON from stdin and posts messages to Slack. Each event is posted as a standalone message to the Slack channel whose name matches the current project directory (e.g. a project at `~/projects/my-app` posts to `#my-app`). If no matching channel is found, messages fall back to a default channel. Two events are handled:
 
-- **Notification** — posted as a reply in the project thread (e.g. when Claude needs your input)
-- **Stop** — posted as a reply when the agent finishes and is ready for the next prompt
+- **Notification** — posted when Claude needs your input
+- **Stop** — posted when the agent finishes and is ready for the next prompt
 
-Thread state is persisted in `~/.claude/slack-sessions.json`. The script uses stdlib only — no pip install required.
+The script uses stdlib only — no pip install required.
 
 ---
 
@@ -20,27 +20,29 @@ Thread state is persisted in `~/.claude/slack-sessions.json`. The script uses st
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App** → **From scratch**.
 2. Give it a name (e.g. "Claude Code") and select your workspace.
 3. In the left sidebar go to **OAuth & Permissions**.
-4. Under **Bot Token Scopes**, add the scope: `chat:write`
+4. Under **Bot Token Scopes**, add the following scopes:
+   - `chat:write` — to post messages
+   - `channels:read` — to look up channels by name
 5. Scroll up and click **Install to Workspace**, then **Allow**.
 6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`. You'll need this shortly.
 
-### 2. Get the channel ID
+### 2. Create a channel for each project
 
-Open Slack and navigate to the channel where you want notifications posted. Click the channel name at the top to open channel details. Scroll to the bottom of the details pane — the channel ID is shown there (e.g. `C0B287AN1`). Copy it.
+Create a Slack channel whose name matches your project directory name. For example, if your project lives at `/Users/you/projects/my-app`, create a channel named `my-app`.
 
-### 3. Invite the bot to the channel
-
-In Slack, open the channel and type:
+Invite the bot to each channel you create:
 
 ```
 /invite @YourAppName
 ```
 
-Replace `YourAppName` with the name you gave your Slack app. The bot must be a member of the channel to post messages.
+### 3. Get a fallback channel ID
+
+If no channel matches the current project name, the script falls back to a default channel. Open Slack and navigate to the channel you want to use as the fallback. Click the channel name at the top to open channel details. Scroll to the bottom of the details pane — the channel ID is shown there (e.g. `C0B287AN1`). Copy it, and invite the bot to that channel as well.
 
 ### 4. Add env vars to `~/.claude/settings.json`
 
-Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` to the `env` object in `~/.claude/settings.json`:
+Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` (fallback) to the `env` object in `~/.claude/settings.json`:
 
 ```json
 {
@@ -51,7 +53,7 @@ Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` to the `env` object in `~/.claude/s
 }
 ```
 
-Replace the values with your actual bot token and channel ID.
+Replace the values with your actual bot token and fallback channel ID.
 
 ### 5. Add hooks to `~/.claude/settings.json`
 
@@ -125,10 +127,12 @@ If you already have an `env` section, merge everything into the same top-level o
 
 ## Verification
 
-Start a Claude Code session in any project. When the agent finishes or sends a notification, you should see a message appear in your Slack channel. The first event in a given project directory creates a new thread; subsequent events in the same session reply to that thread.
+Start a Claude Code session in any project that has a matching Slack channel. When the agent finishes or sends a notification, you should see a message appear in that project's channel.
 
 If messages are not appearing, check that:
 
-- The bot token and channel ID are set correctly in `settings.json`
-- The bot has been invited to the channel
-- The path to `notify.py` in the hooks config is an absolute path and the file is executable
+- The bot token is set correctly in `settings.json`
+- The bot has the `chat:write` and `channels:read` scopes
+- The bot has been invited to the target channel
+- The channel name exactly matches the project directory name
+- The path to `notify.py` in the hooks config is an absolute path

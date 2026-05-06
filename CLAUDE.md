@@ -57,20 +57,21 @@ bd close <id>         # Complete work
 echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
   SLACK_BOT_TOKEN=<token> SLACK_CHANNEL_ID=<channel> python3 notify.py
 
-# Run twice with same cwd to verify threading; different cwd for separate thread
+# Events post to the channel matching the project directory name (e.g. #slack-fork-pizza)
+# Falls back to SLACK_CHANNEL_ID if no matching channel exists
 ```
 
 ## Architecture Overview
 
-Single-file Python script (`notify.py`) invoked by Claude Code hooks. On `Stop` events, posts "Agent stopped" + last assistant message to Slack. On `Notification` events, posts the notification message. Thread state (cwd → thread_ts) persisted in `~/.claude/slack-sessions.json`. Stdlib only — no pip dependencies.
+Single-file Python script (`notify.py`) invoked by Claude Code hooks. On `Stop` events, posts "Agent stopped" + last assistant message to Slack. On `Notification` events, posts the notification message. Each event is a standalone message posted to the Slack channel whose name matches `Path(cwd).name`. Falls back to `SLACK_CHANNEL_ID` if no matching channel is found. Channel name→ID lookup is cached in a module-level dict. Stdlib only — no pip dependencies.
 
 Hooks configured in `~/.claude/settings.json`:
 - `Notification` and `Stop` → `python3 /Users/chadallen/projects/slack-fork-pizza/notify.py`
 - Env vars: `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`
+- Required Slack scopes: `chat:write`, `channels:read`
 
 ## Conventions & Patterns
 
 - Always exit 0 — a non-zero exit blocks Claude Code
 - Wrap all logic in try/except in `main()` to guarantee exit 0
 - Stdlib only — no third-party packages
-- `~/.claude/slack-sessions.json` is gitignored — never commit it

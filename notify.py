@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Claude Code hook script: posts Slack notifications with per-project threading.
+Claude Code hook script: posts Slack notifications to per-project channels.
 
 Reads hook event JSON from stdin. Handles Notification and Stop events.
-Thread state persisted in ~/.claude/slack-sessions.json.
+Uses conversations.list to find a channel matching the project directory name.
+Falls back to SLACK_CHANNEL_ID if no matching channel is found.
 Always exits 0 to avoid blocking Claude Code.
 """
 
@@ -11,36 +12,61 @@ import json
 import os
 import sys
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
-SESSIONS_FILE = Path.home() / ".claude" / "slack-sessions.json"
-SLACK_API_URL = "https://slack.com/api/chat.postMessage"
+SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
+SLACK_LIST_URL = "https://slack.com/api/conversations.list"
+
+# Module-level cache: channel name -> channel ID
+_channel_cache: dict = {}
 
 
-def load_sessions():
-    if SESSIONS_FILE.exists():
-        try:
-            with open(SESSIONS_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
+def find_channel_id(token: str, project_name: str) -> str | None:
+    """Look up the Slack channel ID for project_name using conversations.list.
+
+    Results are cached in _channel_cache to avoid repeated API calls.
+    Returns the channel ID string, or None if not found.
+    """
+    if project_name in _channel_cache:
+        return _channel_cache[project_name]
+
+    cursor = None
+    while True:
+        params: dict = {"limit": 200, "exclude_archived": "true"}
+        if cursor:
+            params["cursor"] = cursor
+
+        url = SLACK_LIST_URL + "?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+
+        if not data.get("ok"):
+            break
+
+        for channel in data.get("channels", []):
+            name = channel.get("name", "")
+            _channel_cache[name] = channel["id"]
+
+        next_cursor = (
+            data.get("response_metadata", {}).get("next_cursor") or ""
+        )
+        if not next_cursor:
+            break
+        cursor = next_cursor
+
+    return _channel_cache.get(project_name)
 
 
-def save_sessions(sessions):
-    SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SESSIONS_FILE, "w") as f:
-        json.dump(sessions, f, indent=2)
-
-
-def post_message(token, channel, text, thread_ts=None):
+def post_message(token: str, channel: str, text: str) -> dict:
     payload = {"channel": channel, "text": text}
-    if thread_ts:
-        payload["thread_ts"] = thread_ts
-
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        SLACK_API_URL,
+        SLACK_POST_URL,
         data=data,
         headers={
             "Authorization": f"Bearer {token}",
@@ -53,9 +79,9 @@ def post_message(token, channel, text, thread_ts=None):
 
 def main():
     token = os.environ.get("SLACK_BOT_TOKEN")
-    channel = os.environ.get("SLACK_CHANNEL_ID")
+    fallback_channel = os.environ.get("SLACK_CHANNEL_ID")
 
-    if not token or not channel:
+    if not token:
         return
 
     raw = sys.stdin.read()
@@ -74,20 +100,19 @@ def main():
     else:
         return
 
-    sessions = load_sessions()
-    thread_ts = sessions.get(cwd)
+    project_name = Path(cwd).name if cwd else ""
 
-    if not thread_ts:
-        project_name = Path(cwd).name if cwd else "unknown"
-        anchor_text = f"[{project_name}] New session"
-        result = post_message(token, channel, anchor_text)
-        if result.get("ok"):
-            thread_ts = result["ts"]
-            sessions[cwd] = thread_ts
-            save_sessions(sessions)
+    channel = None
+    if project_name:
+        channel = find_channel_id(token, project_name)
 
-    if thread_ts:
-        post_message(token, channel, message_text, thread_ts=thread_ts)
+    if not channel:
+        channel = fallback_channel
+
+    if not channel:
+        return
+
+    post_message(token, channel, message_text)
 
 
 try:
