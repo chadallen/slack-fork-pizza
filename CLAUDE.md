@@ -1,7 +1,5 @@
 # Project Instructions for AI Agents
 
-This file provides instructions and context for AI coding agents working on this project.
-
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
@@ -49,29 +47,33 @@ bd close <id>         # Complete work
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
 
-
 ## Build & Test
 
-```bash
-# Manual end-to-end test
-echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
-  SLACK_BOT_TOKEN=<token> SLACK_CHANNEL_ID=<channel> python3 notify.py
+Enable the plugin via directory marketplace source in `extraKnownMarketplaces` pointing to
+`.claude-plugin/marketplace.json`, then install from the Claude Code marketplace UI.
 
-# Events post to the channel matching the project directory name (e.g. #slack-fork-pizza)
-# Falls back to SLACK_CHANNEL_ID if no matching channel exists
+```bash
+# Manual end-to-end test (posts to channel matching cwd name, falls back to SLACK_CHANNEL_ID)
+echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
+  SLACK_BOT_TOKEN=<token> python3 notify.py
 ```
 
 ## Architecture Overview
 
-Single-file Python script (`notify.py`) invoked by Claude Code hooks. On `Stop` events, posts "Agent stopped" + last assistant message to Slack. On `Notification` events, posts the notification message. Each event is a standalone message posted to the Slack channel whose name matches `Path(cwd).name`. Falls back to `SLACK_CHANNEL_ID` if no matching channel is found. Channel name→ID lookup is cached in a module-level dict. Stdlib only — no pip dependencies.
+Claude Code plugin that auto-registers hooks (`Notification`, `Stop`, `SessionStart`) and an
+MCP server (`ask-human`) on install. Key files:
 
-Hooks configured in `~/.claude/settings.json`:
-- `Notification` and `Stop` → `python3 /Users/chadallen/projects/slack-fork-pizza/notify.py`
-- Env vars: `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`
-- Required Slack scopes: `chat:write`, `channels:read`
+- `notify.py` — `Notification`/`Stop` handler; posts to Slack
+- `slack_channel.py` — shared channel lookup (name → ID via `conversations.list`)
+- `scripts/inject-conventions.sh` — `SessionStart` hook; injects `docs/conventions.md`
+- `commands/setup.md` — `/slack:setup` slash command
+
+Each project routes to a Slack channel matching its directory name; falls back to
+`SLACK_CHANNEL_ID`.
 
 ## Conventions & Patterns
 
 - Always exit 0 — a non-zero exit blocks Claude Code
 - Wrap all logic in try/except in `main()` to guarantee exit 0
 - Stdlib only — no third-party packages
+- Channel lookup lives in `slack_channel.py` — import it, don't duplicate
