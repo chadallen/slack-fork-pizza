@@ -2,30 +2,24 @@
 
 Get pinged in Slack when Claude Code needs your attention — one channel per project, automatically routed by project directory name.
 
-## Quick install
+## Install
 
-Add the following to `~/.claude/settings.json`:
+```
+/plugin marketplace add chadallen/slack-fork-pizza
+/plugin install slack-notify@slack-notify
+```
+
+Then add your Slack bot token to `~/.claude/settings.json`:
 
 ```json
 {
-  "extraKnownMarketplaces": {
-    "slack-notify": {
-      "source": {
-        "source": "github",
-        "repo": "chadallen/slack-fork-pizza"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "slack-notify@slack-notify": true
-  },
   "env": {
     "SLACK_BOT_TOKEN": "xoxb-your-token-here"
   }
 }
 ```
 
-That's it. The plugin registers its own hooks — no additional settings.json editing required.
+The plugin registers its own hooks and MCP server — no other configuration needed.
 
 ## How it works
 
