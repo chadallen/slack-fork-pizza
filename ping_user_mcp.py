@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """
-MCP server exposing an ask_human tool.
+MCP server exposing a ping_user tool.
 
 Posts a question to the project's Slack channel, polls for a thread reply,
 and returns the reply text to Claude. Stdlib only.
 
-Register in ~/.claude/settings.json:
-  "mcpServers": {
-    "ask-human": {
-      "command": "python3",
-      "args": ["/Users/chadallen/projects/slack-fork-pizza/ask_human_mcp.py"],
-      "env": {"SLACK_BOT_TOKEN": "xoxb-...", "SLACK_CHANNEL_ID": "C0..."}
-    }
-  }
+Registered automatically by the slack-notify plugin via .mcp.json.
 """
 
 import json
@@ -104,8 +97,8 @@ def poll_for_reply(token: str, channel: str, thread_ts: str, bot_user_id: str) -
     raise TimeoutError(f"No reply received within {TIMEOUT}s")
 
 
-def handle_ask_human(arguments: dict) -> dict:
-    """Execute the ask_human tool."""
+def handle_ping_user(arguments: dict) -> dict:
+    """Execute the ping_user tool."""
     question = arguments.get("question", "")
     if not question:
         return {"content": [{"type": "text", "text": "Error: question is required"}], "isError": True}
@@ -164,7 +157,7 @@ def handle_message(msg: dict):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "ask-human", "version": "1.0.0"},
+                "serverInfo": {"name": "ping-user", "version": "1.0.0"},
             },
         })
 
@@ -175,7 +168,7 @@ def handle_message(msg: dict):
             "result": {
                 "tools": [
                     {
-                        "name": "ask_human",
+                        "name": "ping_user",
                         "description": (
                             "Ask the human a question via Slack. Posts to the project's "
                             "Slack channel and waits up to 5 minutes for a reply. Use this "
@@ -201,8 +194,8 @@ def handle_message(msg: dict):
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
 
-        if tool_name == "ask_human":
-            result = handle_ask_human(arguments)
+        if tool_name == "ping_user":
+            result = handle_ping_user(arguments)
         else:
             result = {"content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}], "isError": True}
 

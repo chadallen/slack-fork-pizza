@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "ask-human": {
+    "ping-user": {
       "command": "python3",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/ask_human_mcp.py"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/ping_user_mcp.py"]
     }
   }
 }
