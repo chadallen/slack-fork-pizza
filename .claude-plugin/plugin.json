@@ -1,0 +1,10 @@
+{
+  "name": "slack-notify",
+  "version": "0.1.0",
+  "description": "Slack notifications and ask-human round-trip for Claude Code. Auto-registers hooks and MCP server.",
+  "author": {
+    "name": "Chad Allen"
+  },
+  "commands": [],
+  "agents": []
+}

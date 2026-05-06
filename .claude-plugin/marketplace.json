@@ -1,0 +1,13 @@
+{
+  "name": "slack-notify",
+  "owner": {
+    "name": "Chad Allen"
+  },
+  "plugins": [
+    {
+      "name": "slack-notify",
+      "source": "./",
+      "description": "Slack notifications and ask-human round-trip for Claude Code. Auto-registers hooks and MCP server."
+    }
+  ]
+}
