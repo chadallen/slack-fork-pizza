@@ -68,6 +68,9 @@ def main():
         message_text = "\U0001f514 " + event.get("message", "")
     elif hook_event == "Stop":
         message_text = "\u2705 Agent stopped \u2014 ready for next prompt"
+        last_msg = event.get("last_assistant_message", "")
+        if last_msg:
+            message_text += f"\n{last_msg.strip()}"
     else:
         return
 
