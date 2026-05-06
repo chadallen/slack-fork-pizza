@@ -23,45 +23,15 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from slack_channel import find_channel_id
+
 SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
-SLACK_LIST_URL = "https://slack.com/api/conversations.list"
 SLACK_REPLIES_URL = "https://slack.com/api/conversations.replies"
 SLACK_AUTH_URL = "https://slack.com/api/auth.test"
 
 POLL_INTERVAL = 3  # seconds between polling
 TIMEOUT = 300  # 5 minutes
-
-_channel_cache: dict = {}
-
-
-def find_channel_id(token: str, project_name: str) -> str | None:
-    """Look up Slack channel ID matching project_name via conversations.list."""
-    if project_name in _channel_cache:
-        return _channel_cache[project_name]
-
-    cursor = None
-    while True:
-        params: dict = {"limit": 200, "exclude_archived": "true"}
-        if cursor:
-            params["cursor"] = cursor
-
-        url = SLACK_LIST_URL + "?" + urllib.parse.urlencode(params)
-        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-
-        if not data.get("ok"):
-            break
-
-        for channel in data.get("channels", []):
-            _channel_cache[channel.get("name", "")] = channel["id"]
-
-        next_cursor = data.get("response_metadata", {}).get("next_cursor") or ""
-        if not next_cursor:
-            break
-        cursor = next_cursor
-
-    return _channel_cache.get(project_name)
 
 
 def get_bot_user_id(token: str) -> str | None:
