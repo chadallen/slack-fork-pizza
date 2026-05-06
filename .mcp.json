@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ask-human": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/ask_human_mcp.py"]
+    }
+  }
+}
