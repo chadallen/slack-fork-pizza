@@ -52,18 +52,25 @@ bd close <id>         # Complete work
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+# Manual end-to-end test
+echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
+  SLACK_BOT_TOKEN=<token> SLACK_CHANNEL_ID=<channel> python3 notify.py
+
+# Run twice with same cwd to verify threading; different cwd for separate thread
 ```
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+Single-file Python script (`notify.py`) invoked by Claude Code hooks. On `Stop` events, posts "Agent stopped" + last assistant message to Slack. On `Notification` events, posts the notification message. Thread state (cwd → thread_ts) persisted in `~/.claude/slack-sessions.json`. Stdlib only — no pip dependencies.
+
+Hooks configured in `~/.claude/settings.json`:
+- `Notification` and `Stop` → `python3 /Users/chadallen/projects/slack-fork-pizza/notify.py`
+- Env vars: `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- Always exit 0 — a non-zero exit blocks Claude Code
+- Wrap all logic in try/except in `main()` to guarantee exit 0
+- Stdlib only — no third-party packages
+- `~/.claude/slack-sessions.json` is gitignored — never commit it
