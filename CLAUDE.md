@@ -61,7 +61,7 @@ echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizz
 ## Architecture Overview
 
 Claude Code plugin that auto-registers hooks (`Notification`, `Stop`, `SessionStart`) and an
-MCP server (`ask-human`) on install. Key files:
+MCP server (`ping-user`) on install. Key files:
 
 - `notify.py` — `Notification`/`Stop` handler; posts to Slack
 - `slack_channel.py` — shared channel lookup (name → ID via `conversations.list`)
