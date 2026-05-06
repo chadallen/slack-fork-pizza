@@ -1,166 +1,128 @@
-# Build Handoff: slack-fork-pizza
-
-## What You're Building
-
-A Claude Code CLI → Slack notification bridge. When a Claude Code session stops or asks a question, it posts a message to a Slack thread for that project. The user monitors Slack instead of watching terminals.
-
-This is a real project at `~/projects/slack-fork-pizza` with a GitHub repo at `https://github.com/chadallen/slack-fork-pizza`. Build there.
-
-Read `docs/prd.md` before writing any code.
-
----
-
-## Current State
-
-A partial v0 already exists. The user's `~/.claude/settings.json` already has:
-- `Notification` and `Stop` hooks configured, both pointing to `~/.claude/scripts/slack-notify.py`
-- `SLACK_WEBHOOK_URL` in the `env` block (a working incoming webhook)
-- The existing `slack-notify.py` sends flat messages to Slack with no threading
-
-The existing script works but has no threading — every project posts to the same channel as flat messages. You are replacing it with the threaded version described in the PRD.
-
----
-
-## What Needs to Be Built
-
-### 1. `notify.py` — the main script
-Location: `~/projects/slack-fork-pizza/notify.py`
-
-Behavior:
-- Reads hook event JSON from stdin (Claude Code pipes it in)
-- On `Notification` event: posts the message content to the project's Slack thread
-- On `Stop` event: posts "Agent stopped — ready for next prompt" to the project's Slack thread
-- Ignores all other events
-- Thread key is `cwd` (project directory path) — one thread per project, survives `/clear`
-- On first event for a project: calls `chat.postMessage` to create a new message in the channel, saves the returned `ts` as the thread anchor
-- On subsequent events for a project: calls `chat.postMessage` with `thread_ts` set to the saved `ts`
-- Thread state persisted in `~/.claude/slack-sessions.json` (a JSON dict of `{cwd: thread_ts}`)
-- `slack-sessions.json` must NOT be committed (already in `.gitignore`)
-- Uses only Python stdlib — no pip install, no third-party packages
-- Exits 0 always — a non-zero exit would block Claude Code
-
-Environment variables (set in `~/.claude/settings.json`):
-- `SLACK_BOT_TOKEN` — Bot User OAuth Token (starts with `xoxb-`)
-- `SLACK_CHANNEL_ID` — the channel ID to post to (not the name, the ID like `C0B287AN1`)
-
-### 2. Update `~/.claude/settings.json`
-- Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` to the `env` block
-- Remove `SLACK_WEBHOOK_URL` from the `env` block
-- Update both hook commands to point to `~/projects/slack-fork-pizza/notify.py` instead of `~/.claude/scripts/slack-notify.py`
-
-### 3. Update `README.md`
-Write clear setup instructions covering:
-- How to create the Slack app and get a bot token (add `chat:write` scope, install to workspace)
-- How to get the channel ID
-- Which env vars to add to `settings.json`
-- Which hooks to add to `settings.json` (include the exact JSON snippet)
-- How to invite the bot to the channel
-
----
-
-## What NOT to Build in v1
-- Round-trip replies (Slack → CLI) — explicitly out of scope
-- Multiple concurrent Claude sessions per project
-- Block Kit / rich formatting
-- Slack channel creation
-- Any new dependencies
-
----
-
-## Before You Start Coding
-
-The user needs to complete a Slack app config step first — adding the `chat:write` scope and getting a bot token. The Slack app already exists (App ID: `A0B2PKDCEBA`, workspace: `fork-pizza`).
-
-**Ask the user for `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` before writing any code.** Once they provide those, you can build and test end-to-end.
-
----
-
-## Testing
-
-Once built, test by running:
-```bash
-echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
-  SLACK_BOT_TOKEN=<token> SLACK_CHANNEL_ID=<channel> python3 ~/projects/slack-fork-pizza/notify.py
-```
-
-Run it twice — first run should create a thread, second run should reply in the same thread.
-
-Then run with a different `cwd` to confirm a separate thread is created.
-
-# PRD: Claude Code → Slack Session Notifications
+# PRD: slack-notify — Claude Code Slack Plugin
 
 ## Problem
 
-When running multiple Claude Code sessions across projects, the user has no way to know when a session needs attention without watching every terminal. Sessions run silently and only matter when they stop or ask a question.
+When running multiple Claude Code sessions across projects, there's no way to know when a session needs attention without watching every terminal. Sessions run silently and only surface when they stop or ask a question.
 
 ## Goal
 
-Slack becomes the attention layer. Terminals run headlessly. User only looks at Slack when needed.
+Slack becomes the attention layer. Terminals run headlessly. The user only looks at Slack when needed — and can reply to Claude from Slack when input is required.
 
-## User Stories
+---
 
-- As a user with 3 projects running, I want to see a Slack message when any session stops or asks a question, so I don't have to watch terminals.
-- As a user who just got pinged, I want to know which project it's from and what it needs, so I can decide whether to engage.
-- As a user who ran `/clear` in a terminal, I want subsequent messages to appear in the same Slack thread as before, so the project's conversation history stays together.
-- As a user who wants more detail, I want to be able to go to the terminal and pick up there.
+## What Was Built
 
-## Functional Requirements
+### Plugin architecture
 
-### Notifications
-- On `Stop`: post "Agent finished — ready for next prompt" to the project's thread
-- On `Notification` (AskUserQuestion etc.): post the message content to the project's thread
-- Messages are brief — no verbose output, no tool call traces
+`slack-notify` is a Claude Code plugin installed via the marketplace UI. On install, it auto-registers:
+- **Hooks:** `Notification`, `Stop`, `SessionStart`
+- **MCP server:** `ping-user`
+- **Slash command:** `/slack:setup`
 
-### Thread model
-- One thread per project directory (`cwd`)
-- Thread persists across `/clear`, restarts, and new invocations in the same project
-- Thread is created on first event for a project; reused for all subsequent events
-- Thread header (first message) identifies the project by name
+Plugin manifest lives at `.claude-plugin/plugin.json`. Install by adding the repo as a directory marketplace source pointing to `.claude-plugin/marketplace.json`.
 
-### Session persistence
-- Mapping of `project_path → slack_thread_ts` stored in `~/.claude/slack-sessions.json`
-- File is created automatically on first use
+### Channel-per-project routing
 
-## Out of Scope (v1)
-- Replying from Slack back to the CLI
-- Multiple concurrent Claude sessions in the same project directory
-- Slack channel creation (uses one pre-existing channel)
-- Rich formatting / Block Kit buttons
+Each project maps to a Slack channel by name: directory `~/projects/foo` routes to `#foo`. Channel lookup uses `conversations.list` (paginated, cached in memory). Falls back to `SLACK_CHANNEL_ID` env var if no matching channel exists.
+
+Implementation: `slack_channel.py` — shared module imported by both `notify.py` and `ping_user_mcp.py`.
+
+### Outbound notifications (`notify.py`)
+
+Handles `Notification` and `Stop` hook events:
+- `Notification`: posts `🔔 <message>` to the project channel
+- `Stop`: posts `✅ Agent stopped — ready for next prompt` with the last assistant message appended
+
+No threading. No state files. Each event is a flat message in the project's channel.
+
+### Round-trip: Claude asks, user replies (`ping_user_mcp.py`)
+
+MCP stdio server exposing one tool: `ping_user(question: str) → str`.
+
+When Claude calls `ping_user`:
+1. Posts `❓ *Claude needs input:* <question>` to the project channel
+2. Polls `conversations.replies` every 3 seconds
+3. Returns the first non-bot reply text to Claude
+4. Times out after 5 minutes
+
+Claude-initiated — Claude must decide to call `ping_user`. This is intentional: it avoids the need for a persistent daemon and works within Claude Code's current IPC constraints (no mechanism exists to inject a prompt into a running interactive session from outside).
+
+### SessionStart convention injection (`scripts/inject-conventions.sh`)
+
+On every session start, injects `docs/conventions.md` as context. Teaches Claude:
+- What `ping_user` is and when to use it
+- Channel-per-project routing behavior
+
+### Setup slash command (`commands/setup.md`)
+
+`/slack:setup` guides through:
+1. Validating or creating a Slack bot token
+2. Configuring `SLACK_BOT_TOKEN` (required) and `SLACK_CHANNEL_ID` (optional fallback)
+3. Creating per-project channels and inviting the bot
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `SLACK_BOT_TOKEN` | Yes | Bot User OAuth Token (`xoxb-...`) |
+| `SLACK_CHANNEL_ID` | No | Fallback channel ID if no project channel exists |
+
+Scopes required on the Slack app: `chat:write`, `channels:read`.
+
+---
+
+## Key Design Decisions
+
+**Channel-per-project over threading.** The original plan used one shared channel with threads keyed by `cwd`. Replaced with dedicated channels per project — simpler Slack UX, no state file needed, each project's messages are naturally scoped.
+
+**MCP round-trip over daemon + hook injection.** Research (`docs/round-trip-research.md`) confirmed there's no stable IPC mechanism for injecting into a running session. The `UserPromptSubmit` + `additionalContext` hook approach requires a persistent daemon and has documented reliability issues. The MCP tool pattern — where Claude explicitly calls `ping_user` — is simpler, more reliable, and ships without a background process.
+
+**Stdlib only.** No pip dependencies. The plugin installs and runs with whatever Python 3 is on the system.
+
+**Always exit 0.** All hook scripts wrap logic in `try/except` and exit 0 unconditionally. A non-zero exit blocks Claude Code.
+
+---
+
+## File Map
+
+```
+notify.py              — Notification/Stop hook handler
+ping_user_mcp.py       — MCP server (ping_user tool)
+slack_channel.py       — Channel lookup shared module
+.claude-plugin/
+  plugin.json          — Plugin manifest
+  marketplace.json     — Local marketplace source
+hooks/
+  hooks.json           — Hook registrations (Notification, Stop, SessionStart)
+scripts/
+  inject-conventions.sh — SessionStart hook; injects docs/conventions.md
+commands/
+  setup.md             — /slack:setup slash command
+docs/
+  conventions.md       — ping_user conventions injected at session start
+  round-trip-research.md — Research on round-trip feasibility (May 2026)
+  prd.md               — This document
+```
+
+---
+
+## Out of Scope
+
+- Slack → CLI injection without Claude initiating (requires unsupported IPC — see `docs/round-trip-research.md`)
+- Multiple concurrent Claude sessions per project directory
+- Block Kit / rich formatting
+- Slack channel creation (user creates channels manually)
 - Mobile push or other notification targets
 
-## Technical Approach
+---
 
-**What changes from current setup:**
-1. Swap incoming webhook → Slack Bot token + `chat.postMessage` (needed to get back the `thread_ts` on first post)
-2. Upgrade `slack-notify.py` to manage project→thread mapping
-3. Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` to `settings.json` env
+## Integration Points for fork-pizza
 
-**User does (Slack app config, ~5 min):**
-- Add `chat:write` OAuth scope to the app
-- Install app to workspace → copy Bot User OAuth Token
-- Invite the bot to your target channel
-- Provide token + channel ID
+The plugin surfaces these integration points for fork-pizza tooling:
 
-**Developer does:**
-- Write `slack-notify.py` (~80 lines, stdlib only — no pip install required)
-- Document env vars and hook configuration
-
-## Slack UX
-
-```
-#claude-sessions channel
-
-┌─ [browser-agent] New session ───────────────┐
-│  ✅ Agent stopped — ready for next prompt   │
-│  🔔 Should I delete these files? (y/n)      │
-│  ✅ Agent stopped — ready for next prompt   │
-└──────────────────────────────────────────────┘
-
-┌─ [fork-pizza] New session ──────────────────┐
-│  ✅ Agent stopped — ready for next prompt   │
-└──────────────────────────────────────────────┘
-```
-
-## Open Questions
-- Repo name and distribution strategy (standalone repo vs. plugin)
-- v2 round-trip: Slack reply → CLI (requires persistent listener process)
+- **`ping_user` MCP tool** — available in any session with the plugin installed. Call `ping_user(question)` to block on a Slack reply. Documented in `docs/conventions.md`.
+- **`slack_channel.py`** — `find_channel_id(token, project_name)` and `resolve_channel(token, cwd, fallback)` are importable from any script running in the plugin root.
+- **Channel naming convention** — project directory name = Slack channel name. fork-pizza can rely on this to route messages predictably.
+- **`SLACK_BOT_TOKEN` env var** — available in all hook and MCP contexts once the plugin is installed and configured.
