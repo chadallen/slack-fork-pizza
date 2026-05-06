@@ -52,7 +52,15 @@ Run `/slack:setup` inside Claude Code for a guided walkthrough. Or do it manuall
 
 ## Channel naming
 
-The plugin routes messages based on `Path(cwd).name` — the last component of the working directory. A project at `/Users/you/projects/my-app` posts to `#my-app`. Create matching channels in Slack and invite the bot.
+The plugin routes messages based on the **directory name on disk** — specifically the last component of the working directory Claude Code is running in. For example:
+
+| Project directory | Slack channel |
+|---|---|
+| `~/projects/my-app` | `#my-app` |
+| `~/projects/slack-fork-pizza` | `#slack-fork-pizza` |
+| `~/work/client-dashboard` | `#client-dashboard` |
+
+This is the actual folder name, not the sanitized path under `~/.claude/projects/`. Create matching channels in Slack and invite the bot.
 
 ## Compatibility
 
