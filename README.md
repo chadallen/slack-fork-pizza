@@ -1,6 +1,6 @@
 # slack-fork-pizza
 
-Get pinged in Slack when Claude Code needs your attention — one channel per project, automatically routed by project directory name.
+Get pinged in Slack when Claude Code needs your attention — and reply from Slack when it asks for help. One channel per project, automatically routed by directory name.
 
 ## Install
 
@@ -21,9 +21,37 @@ Then add your Slack bot token to `~/.claude/settings.json`:
 
 The plugin registers its own hooks and MCP server — no other configuration needed.
 
-## How it works
+## What you get
 
-When Claude Code fires a `Notification` or `Stop` event, the plugin posts a message to the Slack channel whose name matches your project directory. For example, a project at `~/projects/my-app` posts to `#my-app`. If no matching channel exists, messages fall back to the channel specified by `SLACK_CHANNEL_ID`. An MCP server exposes an `ask_human` tool for interactive prompts from within an agent session.
+**Outbound notifications (automatic):** When Claude stops or needs attention, a message appears in your project's Slack channel. No configuration beyond install — this just works.
+
+**Inbound replies (ask_human):** When Claude calls the `ask_human` tool, it posts a question to Slack and waits up to 5 minutes for you to reply **in the thread**. Your reply goes back to Claude and it continues working. This is how you answer Claude from your phone/desktop without going back to the terminal.
+
+## Slack app setup
+
+Run `/slack:setup` inside Claude Code for a guided walkthrough. Or do it manually:
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**.
+2. Name it something like "Claude Code" and pick your workspace.
+3. Go to **OAuth & Permissions** → **Bot Token Scopes** and add:
+   - `chat:write` — post messages
+   - `channels:read` — look up channels by name
+4. Click **Install to Workspace** → **Allow**.
+5. Copy the **Bot User OAuth Token** (starts with `xoxb-`).
+6. For each project, create a Slack channel matching the directory name (see [Channel naming](#channel-naming)).
+7. Invite the bot to each channel: `/invite @Claude Code`
+
+## Channel naming
+
+The plugin routes messages based on the **directory name on disk** — the last component of the working directory Claude Code is running in:
+
+| Project directory | Slack channel |
+|---|---|
+| `~/projects/my-app` | `#my-app` |
+| `~/projects/slack-fork-pizza` | `#slack-fork-pizza` |
+| `~/work/client-dashboard` | `#client-dashboard` |
+
+This is the actual folder name, not the sanitized path under `~/.claude/projects/`.
 
 ## Configuration
 
@@ -32,30 +60,48 @@ When Claude Code fires a `Notification` or `Stop` event, the plugin posts a mess
 | `SLACK_BOT_TOKEN` | Yes | Bot User OAuth Token (`xoxb-…`) |
 | `SLACK_CHANNEL_ID` | No | Fallback channel ID when no project channel matches |
 
-Both variables go in the `env` block of `~/.claude/settings.json`.
+Both go in the `env` block of `~/.claude/settings.json`.
 
-## Slack app setup
+## Telling Claude when to use ask_human
 
-Run `/slack:setup` inside Claude Code for a guided walkthrough. Or do it manually:
+The plugin injects default instructions at session start, but you can reinforce or customize the behavior in your project's `CLAUDE.md`:
 
-1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**.
-2. Under **OAuth & Permissions**, add bot scopes: `chat:write`, `channels:read`.
-3. Install to your workspace and copy the **Bot User OAuth Token**.
-4. Create a Slack channel for each project (name must match the project directory).
-5. Invite the bot to each channel: `/invite @YourAppName`.
+```markdown
+## Slack
 
-## Channel naming
+When you need human input, use the ask_human tool to ask via Slack.
+I may be away from the terminal but monitoring Slack on my phone.
+```
 
-The plugin routes messages based on the **directory name on disk** — specifically the last component of the working directory Claude Code is running in. For example:
+More specific examples:
 
-| Project directory | Slack channel |
-|---|---|
-| `~/projects/my-app` | `#my-app` |
-| `~/projects/slack-fork-pizza` | `#slack-fork-pizza` |
-| `~/work/client-dashboard` | `#client-dashboard` |
+```markdown
+## Slack
 
-This is the actual folder name, not the sanitized path under `~/.claude/projects/`. Create matching channels in Slack and invite the bot.
+- Use ask_human before deleting files, dropping tables, or force-pushing.
+- Use ask_human when a task requirement is ambiguous and you can't proceed.
+- Don't use ask_human for routine status updates — I'll see the Stop notification.
+- If ask_human times out, stop and wait for my next prompt.
+```
+
+For autonomous sessions where Claude runs for a while unattended:
+
+```markdown
+## Slack
+
+This is a long-running autonomous session. Use ask_human liberally:
+- Before any irreversible action
+- When you hit a fork in the road and either path is reasonable
+- When you finish a major milestone and want approval before continuing
+- If you encounter an error you can't resolve after 2 attempts
+```
+
+## Hook trust model
+
+The plugin runs scripts automatically each session — `notify.py` on Stop/Notification events, `inject-conventions.sh` on SessionStart, and `ask_human_mcp.py` as a persistent MCP server. These scripts are controlled by the plugin author and run with your full user permissions.
+
+Pin to a tag (e.g., `@v0.1.0`) so you control when you take updates, and review the diff before upgrading.
 
 ## Compatibility
 
-Works standalone or alongside the fork-pizza plugin. If both are enabled, they compose without conflict — each handles its own hooks.
+Works standalone or alongside the fork-pizza plugin. If both are enabled, they compose without conflict.
