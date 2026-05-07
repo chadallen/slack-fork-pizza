@@ -1,7 +1,7 @@
 {
   "name": "slack-notify",
   "version": "0.1.0",
-  "description": "Slack notifications and ask-human round-trip for Claude Code. Auto-registers hooks and MCP server.",
+  "description": "One-way Slack notifications for Claude Code. Posts the agent's last message to a per-project channel on every Stop event.",
   "author": {
     "name": "Chad Allen"
   },
