@@ -5,8 +5,6 @@ Tests for the shared post_message function in slack_channel.py.
 import json
 import sys
 import unittest
-import urllib.error
-from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

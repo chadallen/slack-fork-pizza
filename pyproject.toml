@@ -19,7 +19,6 @@ exclude = [
     "__pycache__",
     ".claude",
     ".claude-plugin",
-    "ping_user_mcp.py",
 ]
 
 [tool.ruff.lint]

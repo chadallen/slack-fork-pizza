@@ -81,20 +81,29 @@ def handle_ping_user(arguments: dict) -> dict:
     """Execute the ping_user tool."""
     question = arguments.get("question", "")
     if not question:
-        return {"content": [{"type": "text", "text": "Error: question is required"}], "isError": True}
+        return {
+            "content": [{"type": "text", "text": "Error: question is required"}],
+            "isError": True,
+        }
 
     token = os.environ.get("SLACK_BOT_TOKEN", "")
     fallback_channel = os.environ.get("SLACK_CHANNEL_ID", "")
 
     if not token:
-        return {"content": [{"type": "text", "text": "Error: SLACK_BOT_TOKEN not set"}], "isError": True}
+        return {
+            "content": [{"type": "text", "text": "Error: SLACK_BOT_TOKEN not set"}],
+            "isError": True,
+        }
 
     # Determine project channel from cwd
     project_name = Path.cwd().name
     channel = find_channel_id(token, project_name) or fallback_channel
 
     if not channel:
-        return {"content": [{"type": "text", "text": "Error: no Slack channel found"}], "isError": True}
+        return {
+            "content": [{"type": "text", "text": "Error: no Slack channel found"}],
+            "isError": True,
+        }
 
     # Get bot's user ID to filter replies
     bot_user_id = get_bot_user_id(token) or ""
@@ -103,7 +112,10 @@ def handle_ping_user(arguments: dict) -> dict:
     result = post_message(token, channel, f"\u2753 *Claude needs input:*\n{question}")
     thread_ts = result.get("ts")
     if not thread_ts:
-        return {"content": [{"type": "text", "text": "Error: failed to post to Slack"}], "isError": True}
+        return {
+            "content": [{"type": "text", "text": "Error: failed to post to Slack"}],
+            "isError": True,
+        }
 
     # Poll for reply
     try:
@@ -178,7 +190,10 @@ def handle_message(msg: dict):
         if tool_name == "ping_user":
             result = handle_ping_user(arguments)
         else:
-            result = {"content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}], "isError": True}
+            result = {
+                "content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}],
+                "isError": True,
+            }
 
         send_response({"jsonrpc": "2.0", "id": msg_id, "result": result})
 
