@@ -54,7 +54,7 @@ Enable the plugin via directory marketplace source in `extraKnownMarketplaces` p
 
 ```bash
 # Manual end-to-end test (posts to channel matching cwd name, falls back to SLACK_CHANNEL_ID)
-echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza"}' | \
+echo '{"hook_event_name":"Stop","cwd":"/Users/chadallen/projects/slack-fork-pizza","last_assistant_message":"[SLACK_RECAP]\nTest recap message.\n[/SLACK_RECAP]"}' | \
   SLACK_BOT_TOKEN=<token> python3 notify.py
 ```
 
@@ -67,6 +67,7 @@ MCP server (`ping-user`) on install. Key files:
 - `slack_channel.py` — shared channel lookup (name → ID via `conversations.list`)
 - `scripts/inject-conventions.sh` — `SessionStart` hook; injects `docs/conventions.md`
 - `commands/setup.md` — `/slack:setup` slash command
+- `commands/slack.md` — `/slack` command (status, -on, -off)
 
 Each project routes to a Slack channel matching its directory name; falls back to
 `SLACK_CHANNEL_ID`.
