@@ -8,13 +8,12 @@ _channel_cache is cleared before each test to prevent cross-test contamination.
 import json
 import sys
 import unittest
-from io import BytesIO
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import slack_channel
-from slack_channel import find_channel_id, resolve_channel, SLACK_LIST_URL
+from slack_channel import find_channel_id, resolve_channel
 
 
 class FakeResponse:
