@@ -8,13 +8,12 @@ notify.py has module-level side effects (sys.path hack + try: main() + sys.exit)
 We import `main` by patching sys.exit before import and using importlib.
 """
 
-import importlib
 import io
 import json
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 # Ensure the project root is on sys.path so notify.py's own sys.path.insert succeeds
 # and so we can find slack_channel for mocking.
@@ -68,7 +67,8 @@ class TestMuteMarker(unittest.TestCase):
             "hook_event_name": "Notification",
             "message": "hello",
         }
-        with patch.dict("os.environ", {"SLACK_BOT_TOKEN": FAKE_TOKEN, "CLAUDE_PLUGIN_ROOT": "/fake/root"}), \
+        env = {"SLACK_BOT_TOKEN": FAKE_TOKEN, "CLAUDE_PLUGIN_ROOT": "/fake/root"}
+        with patch.dict("os.environ", env), \
              patch("sys.stdin", _make_stdin(event)), \
              patch("pathlib.Path.exists", return_value=True), \
              patch("notify.post_message") as mock_post, \
@@ -84,7 +84,8 @@ class TestMuteMarker(unittest.TestCase):
             "cwd": FAKE_CWD,
             "message": "hello",
         }
-        with patch.dict("os.environ", {"SLACK_BOT_TOKEN": FAKE_TOKEN, "CLAUDE_PLUGIN_ROOT": "/fake/root"}), \
+        env = {"SLACK_BOT_TOKEN": FAKE_TOKEN, "CLAUDE_PLUGIN_ROOT": "/fake/root"}
+        with patch.dict("os.environ", env), \
              patch("sys.stdin", _make_stdin(event)), \
              patch("pathlib.Path.exists", return_value=False), \
              patch("notify.resolve_channel", return_value=FAKE_CHANNEL), \
@@ -229,7 +230,10 @@ class TestStopEventWithRecap(unittest.TestCase):
         event = {
             "hook_event_name": "Stop",
             "cwd": FAKE_CWD,
-            "last_assistant_message": f"Some preamble\n[SLACK_RECAP]\n{recap_text}\n[/SLACK_RECAP]\nTrailing stuff",
+            "last_assistant_message": (
+                f"Some preamble\n[SLACK_RECAP]\n{recap_text}\n"
+                "[/SLACK_RECAP]\nTrailing stuff"
+            ),
         }
         mock_post = self._run(event)
         args = mock_post.call_args[0]
