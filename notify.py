@@ -11,28 +11,10 @@ Always exits 0 to avoid blocking Claude Code.
 import json
 import os
 import sys
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from slack_channel import resolve_channel
-
-SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
-
-
-def post_message(token: str, channel: str, text: str) -> dict:
-    payload = {"channel": channel, "text": text}
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        SLACK_POST_URL,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+from slack_channel import resolve_channel, post_message
 
 
 def main():

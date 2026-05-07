@@ -17,9 +17,8 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from slack_channel import find_channel_id
+from slack_channel import find_channel_id, post_message
 
-SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
 SLACK_REPLIES_URL = "https://slack.com/api/conversations.replies"
 SLACK_AUTH_URL = "https://slack.com/api/auth.test"
 
@@ -36,25 +35,6 @@ def get_bot_user_id(token: str) -> str | None:
         data = json.loads(resp.read())
     if data.get("ok"):
         return data.get("user_id")
-    return None
-
-
-def post_message(token: str, channel: str, text: str) -> str | None:
-    """Post a message to Slack. Returns the thread timestamp (ts) or None."""
-    payload = {"channel": channel, "text": text}
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        SLACK_POST_URL,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read())
-    if result.get("ok"):
-        return result.get("ts")
     return None
 
 
@@ -120,7 +100,8 @@ def handle_ping_user(arguments: dict) -> dict:
     bot_user_id = get_bot_user_id(token) or ""
 
     # Post question
-    thread_ts = post_message(token, channel, f"\u2753 *Claude needs input:*\n{question}")
+    result = post_message(token, channel, f"\u2753 *Claude needs input:*\n{question}")
+    thread_ts = result.get("ts")
     if not thread_ts:
         return {"content": [{"type": "text", "text": "Error: failed to post to Slack"}], "isError": True}
 

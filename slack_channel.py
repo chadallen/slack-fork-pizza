@@ -2,8 +2,9 @@
 Shared Slack channel lookup utilities.
 
 Provides find_channel_id for paginated conversations.list lookup with caching,
-and resolve_channel as a convenience wrapper that derives the project name from
-a cwd path and falls back to a provided channel ID.
+resolve_channel as a convenience wrapper that derives the project name from
+a cwd path and falls back to a provided channel ID, and post_message for
+posting to a Slack channel.
 
 Stdlib only — no pip dependencies.
 """
@@ -14,6 +15,7 @@ import urllib.parse
 from pathlib import Path
 
 SLACK_LIST_URL = "https://slack.com/api/conversations.list"
+SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
 
 # Module-level cache: channel name -> channel ID
 _channel_cache: dict = {}
@@ -57,6 +59,26 @@ def find_channel_id(token: str, project_name: str) -> str | None:
         cursor = next_cursor
 
     return _channel_cache.get(project_name)
+
+
+def post_message(token: str, channel: str, text: str) -> dict:
+    """Post a message to a Slack channel.
+
+    Returns the parsed JSON response dict. Callers can check response['ok']
+    and retrieve fields like response['ts'].
+    """
+    payload = {"channel": channel, "text": text}
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        SLACK_POST_URL,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())
 
 
 def resolve_channel(token: str, cwd: str, fallback_channel: str) -> str | None:
