@@ -55,10 +55,29 @@ def main():
     if hook_event == "Notification":
         message_text = "\U0001f514 " + event.get("message", "")
     elif hook_event == "Stop":
-        message_text = "\u2705 Agent stopped \u2014 ready for next prompt"
+        project_name = Path(cwd).name if cwd else "unknown"
         last_msg = event.get("last_assistant_message", "")
+        recap = None
         if last_msg:
-            message_text += f"\n{last_msg.strip()}"
+            start_marker = "[SLACK_RECAP]"
+            end_marker = "[/SLACK_RECAP]"
+            start_idx = last_msg.find(start_marker)
+            end_idx = last_msg.find(end_marker)
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                recap = last_msg[start_idx + len(start_marker):end_idx].strip()
+        if recap:
+            body = recap
+        elif last_msg:
+            stripped = last_msg.strip()
+            if len(stripped) > 500:
+                body = "..." + stripped[-500:]
+            else:
+                body = stripped
+        else:
+            body = None
+        message_text = f"\u2705 {project_name}"
+        if body:
+            message_text += f"\n{body}"
     else:
         return
 
