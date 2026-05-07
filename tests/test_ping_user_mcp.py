@@ -385,8 +385,8 @@ class TestHandlePingUserSuccessfulRoundTrip(unittest.TestCase):
              patch("time.sleep"), \
              patch("time.time", side_effect=[0, 0, 0, 1000]):
             mock_urlopen.side_effect = [auth_response, replies_response]
-            result = handle_ping_user({"question": "Any humans?"}),
-        self.assertEqual(result[0]["content"][0]["text"], "the real answer")
+            result = handle_ping_user({"question": "Any humans?"})
+        self.assertEqual(result["content"][0]["text"], "the real answer")
 
     def test_post_fails_returns_error(self):
         """If post_message returns no ts, handle_ping_user returns an error."""
