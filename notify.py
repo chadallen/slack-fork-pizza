@@ -36,6 +36,10 @@ def post_message(token: str, channel: str, text: str) -> dict:
 
 
 def main():
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", str(Path(__file__).parent))
+    if Path(plugin_root, ".slack-notify-disabled").exists():
+        return
+
     token = os.environ.get("SLACK_BOT_TOKEN")
     fallback_channel = os.environ.get("SLACK_CHANNEL_ID")
 

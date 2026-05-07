@@ -5,6 +5,6 @@
   "author": {
     "name": "Chad Allen"
   },
-  "commands": ["./commands/setup.md"],
+  "commands": ["./commands/setup.md", "./commands/slack.md"],
   "agents": []
 }
